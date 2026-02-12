@@ -19,6 +19,9 @@ class Card(models.Model):
         managed = False
         db_table = 'cards'
 
+    def __str__(self):
+        return f"{self.name} ({self.setCode})"
+
 
 class CardIdentifiers(models.Model):
     """Unmanaged model for the mtgjson `cardIdentifiers` table."""
@@ -35,6 +38,9 @@ class CardIdentifiers(models.Model):
             return None
         sid = self.scryfallId
         return f"https://cards.scryfall.io/normal/front/{sid[0]}/{sid[1]}/{sid}.jpg"
+    
+    def __str__(self):
+        return self.uuid
 
 
 class Vote(models.Model):
@@ -49,3 +55,9 @@ class Vote(models.Model):
     class Meta:
         db_table = 'matchup_vote'
 
+    def __str__(self):
+        if self.chosen_uuid == self.card_1_uuid:
+            return f"({self.card_1_uuid}) 👈 {self.card_2_uuid}"
+        if self.chosen_uuid == self.card_2_uuid:
+            return f"{self.card_1_uuid} 👉 ({self.card_2_uuid})"
+        return f"{self.card_1_uuid} 🤷 {self.card_2_uuid}"

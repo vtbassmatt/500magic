@@ -17,7 +17,7 @@
 </head>
 <body>
   <h1>Which card is more famous?</h1>
-  <p class="prompt">Click a card to choose.</p>
+  <p class="prompt">Don't think too hard. Just click a card to choose.</p>
   <form method="post" class="matchup">
     {% csrf_token %}
     <input type="hidden" name="card_1_uuid" value="{{ card1.uuid }}">
