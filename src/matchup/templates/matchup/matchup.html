@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>500 Magic</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  h1 { margin-bottom: 0.25em; font-size: 1.2em; }
+  p.prompt { margin-bottom: 1em; color: #aaa; }
+  .matchup { display: flex; gap: 1.5em; align-items: flex-start; }
+  .card-choice { background: none; border: 3px solid transparent; border-radius: 12px; padding: 0; cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
+  .card-choice:hover, .card-choice:focus { border-color: #f0c040; transform: scale(1.03); }
+  .card-choice img { display: block; width: 250px; border-radius: 10px; }
+</style>
+</head>
+<body>
+  <h1>Which card is more famous?</h1>
+  <p class="prompt">Click a card to choose.</p>
+  <form method="post" class="matchup">
+    {% csrf_token %}
+    <input type="hidden" name="card_1_uuid" value="{{ card1.uuid }}">
+    <input type="hidden" name="card_2_uuid" value="{{ card2.uuid }}">
+    <button type="submit" name="chosen_uuid" value="{{ card1.uuid }}" class="card-choice" title="{{ card1.name }}">
+      <img src="{{ card1.image_url }}" alt="{{ card1.name }}" loading="eager" width="250" height="349">
+    </button>
+    <button type="submit" name="chosen_uuid" value="{{ card2.uuid }}" class="card-choice" title="{{ card2.name }}">
+      <img src="{{ card2.image_url }}" alt="{{ card2.name }}" loading="eager" width="250" height="349">
+    </button>
+  </form>
+</body>
+</html>

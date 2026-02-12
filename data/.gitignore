@@ -1,0 +1,3 @@
+# Don't commit database files
+*.sqlite
+*.sqlite3
