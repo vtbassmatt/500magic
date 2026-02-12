@@ -56,6 +56,9 @@ class Matchup(models.Model):
 
     class Meta:
         db_table = 'matchup_matchup'
+    
+    def __str__(self):
+        return f"{self.card_1_uuid[:8]} vs {self.card_2_uuid[:8]} ({self.voted if self.voted else 'not voted'})"
 
 
 class Vote(models.Model):
@@ -72,10 +75,10 @@ class Vote(models.Model):
 
     def __str__(self):
         if self.chosen_uuid == self.card_1_uuid:
-            return f"({self.card_1_uuid}) 👈 {self.card_2_uuid}"
+            return f"({self.card_1_uuid[:8]}) 👈 {self.card_2_uuid[:8]}"
         if self.chosen_uuid == self.card_2_uuid:
-            return f"{self.card_1_uuid} 👉 ({self.card_2_uuid})"
-        return f"{self.card_1_uuid} 🤷 {self.card_2_uuid}"
+            return f"{self.card_1_uuid[:8]} 👉 ({self.card_2_uuid[:8]})"
+        return f"{self.card_1_uuid[:8]} 🤷 {self.card_2_uuid[:8]}"
 
 
 class CardRating(models.Model):
