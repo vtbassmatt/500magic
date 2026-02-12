@@ -18,6 +18,9 @@
   .card-choice { background: none; border: 3px solid transparent; border-radius: 12px; padding: 0; cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
   .card-choice:hover, .card-choice:focus { border-color: #f0c040; transform: scale(1.03); }
   .card-choice img { display: block; width: 250px; border-radius: 10px; }
+  footer { margin-top: 2em; max-width: 600px; text-align: center; }
+  footer p { font-size: 0.7em; color: #777; }
+  footer a { color: #999; }
 </style>
 </head>
 <body>
@@ -33,5 +36,8 @@
       <img src="{{ card2.image_url }}" alt="{{ card2.name }}" loading="eager" width="250" height="349">
     </button>
   </form>
+  <footer>
+    <p>This is unofficial Fan Content permitted under the <a href="https://company.wizards.com/en/legal/fancontentpolicy">Fan Content Policy</a>. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. &copy;Wizards of the Coast LLC.</p>
+  </footer>
 </body>
 </html>
