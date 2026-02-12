@@ -1,4 +1,4 @@
-ARG PYTHON_VERSION=3.10-slim
+ARG PYTHON_VERSION=3.14-slim
 
 FROM python:${PYTHON_VERSION}
 
@@ -9,12 +9,11 @@ RUN mkdir -p /code
 
 WORKDIR /code
 
-RUN pip install poetry
-COPY pyproject.toml poetry.lock /code/
-RUN poetry config virtualenvs.create false
-RUN poetry install --only main --no-root --no-interaction
+RUN pip install uv
+COPY pyproject.toml uv.lock /code/
+RUN uv sync --system
 COPY . /code
 
 EXPOSE 8000
 
-CMD ["python","manage.py","runserver","0.0.0.0:8000"]
+CMD ["uv","run","python","manage.py","runserver","0.0.0.0:8000"]
