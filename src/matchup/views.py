@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.http import HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import redirect, render
 
@@ -73,7 +74,7 @@ def matchup(request):
         # Look up the matchup; reject if not found or already voted
         try:
             m = Matchup.objects.get(token=matchup_token, voted__isnull=True)
-        except (Matchup.DoesNotExist, ValueError):
+        except (Matchup.DoesNotExist, ValueError, ValidationError):
             return HttpResponseBadRequest('Invalid or already-used matchup')
 
         # Validate chosen card is one of the two in this matchup
