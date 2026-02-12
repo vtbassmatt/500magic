@@ -76,3 +76,18 @@ class Vote(models.Model):
         if self.chosen_uuid == self.card_2_uuid:
             return f"{self.card_1_uuid} 👉 ({self.card_2_uuid})"
         return f"{self.card_1_uuid} 🤷 {self.card_2_uuid}"
+
+
+class CardRating(models.Model):
+    """Elo rating for a card, keyed by card name (across all printings)."""
+
+    name = models.TextField(unique=True)
+    rating = models.FloatField(default=1500.0)
+    wins = models.IntegerField(default=0)
+    losses = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = 'matchup_cardrating'
+
+    def __str__(self):
+        return f"{self.name} ({self.rating:.0f})"

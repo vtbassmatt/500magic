@@ -1,8 +1,10 @@
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import redirect, render
+from django.utils import timezone
 
-from .models import Card, CardIdentifiers, Matchup, Vote
+from .elo import update_ratings
+from .models import Card, CardIdentifiers, CardRating, Matchup, Vote
 
 
 def _get_random_matchup():
@@ -102,7 +104,8 @@ def matchup(request):
             ip_address=ip,
         )
 
-        from django.utils import timezone
+        # Update Elo ratings
+        _update_elo(m.card_1_uuid, m.card_2_uuid, chosen_uuid)
 
         m.voted = timezone.now()
         m.save(update_fields=['voted'])
@@ -110,3 +113,34 @@ def matchup(request):
         return redirect('matchup')
 
     return HttpResponseNotAllowed(['GET', 'POST'])
+
+
+def _update_elo(card_1_uuid: str, card_2_uuid: str, chosen_uuid: str) -> None:
+    """Resolve card UUIDs to names and update Elo ratings."""
+    names = dict(
+        Card.objects.using('mtgjson')
+        .filter(uuid__in=[card_1_uuid, card_2_uuid])
+        .values_list('uuid', 'name')
+    )
+    name_1 = names.get(card_1_uuid)
+    name_2 = names.get(card_2_uuid)
+    if not name_1 or not name_2:
+        return
+
+    rating_1, _ = CardRating.objects.get_or_create(name=name_1)
+    rating_2, _ = CardRating.objects.get_or_create(name=name_2)
+
+    a_won = chosen_uuid == card_1_uuid
+    new_r1, new_r2 = update_ratings(rating_1.rating, rating_2.rating, a_won)
+
+    rating_1.rating = new_r1
+    rating_2.rating = new_r2
+    if a_won:
+        rating_1.wins += 1
+        rating_2.losses += 1
+    else:
+        rating_2.wins += 1
+        rating_1.losses += 1
+
+    rating_1.save()
+    rating_2.save()
