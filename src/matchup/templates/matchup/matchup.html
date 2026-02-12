@@ -20,8 +20,7 @@
   <p class="prompt">Don't think too hard. Just click a card to choose.</p>
   <form method="post" class="matchup">
     {% csrf_token %}
-    <input type="hidden" name="card_1_uuid" value="{{ card1.uuid }}">
-    <input type="hidden" name="card_2_uuid" value="{{ card2.uuid }}">
+    <input type="hidden" name="matchup_token" value="{{ matchup_token }}">
     <button type="submit" name="chosen_uuid" value="{{ card1.uuid }}" class="card-choice" title="{{ card1.name }}">
       <img src="{{ card1.image_url }}" alt="{{ card1.name }}" loading="eager" width="250" height="349">
     </button>

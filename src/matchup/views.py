@@ -1,7 +1,7 @@
 from django.http import HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import redirect, render
 
-from .models import Card, CardIdentifiers, Vote
+from .models import Card, CardIdentifiers, Matchup, Vote
 
 
 def _get_random_matchup():
@@ -51,31 +51,60 @@ def matchup(request):
         card1, card2 = _get_random_matchup()
         if not card1 or not card2:
             return render(request, 'matchup/error.html', {'message': 'Could not find cards.'})
+
+        m = Matchup.objects.create(
+            card_1_uuid=card1['uuid'],
+            card_2_uuid=card2['uuid'],
+        )
+
         return render(request, 'matchup/matchup.html', {
             'card1': card1,
             'card2': card2,
+            'matchup_token': m.token,
         })
 
     elif request.method == 'POST':
-        card_1_uuid = request.POST.get('card_1_uuid')
-        card_2_uuid = request.POST.get('card_2_uuid')
-        chosen_uuid = request.POST.get('chosen_uuid')
+        matchup_token = request.POST.get('matchup_token', '')
+        chosen_uuid = request.POST.get('chosen_uuid', '')
 
-        if not all([card_1_uuid, card_2_uuid, chosen_uuid]):
+        if not matchup_token or not chosen_uuid:
             return HttpResponseBadRequest('Missing fields')
-        if chosen_uuid not in (card_1_uuid, card_2_uuid):
+
+        # Look up the matchup; reject if not found or already voted
+        try:
+            m = Matchup.objects.get(token=matchup_token, voted__isnull=True)
+        except (Matchup.DoesNotExist, ValueError):
+            return HttpResponseBadRequest('Invalid or already-used matchup')
+
+        # Validate chosen card is one of the two in this matchup
+        if chosen_uuid not in (m.card_1_uuid, m.card_2_uuid):
             return HttpResponseBadRequest('Invalid choice')
+
+        # Verify both cards exist in mtgjson
+        # We generated the matchup so this shouldn't be necessary
+        # existing = set(
+        #     Card.objects.using('mtgjson')
+        #     .filter(uuid__in=[m.card_1_uuid, m.card_2_uuid])
+        #     .values_list('uuid', flat=True)
+        # )
+        # if len(existing) != 2:
+        #     return HttpResponseBadRequest('Card not found')
 
         # Get client IP, respecting X-Forwarded-For
         xff = request.META.get('HTTP_X_FORWARDED_FOR')
         ip = xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR')
 
         Vote.objects.create(
-            card_1_uuid=card_1_uuid,
-            card_2_uuid=card_2_uuid,
+            card_1_uuid=m.card_1_uuid,
+            card_2_uuid=m.card_2_uuid,
             chosen_uuid=chosen_uuid,
             ip_address=ip,
         )
+
+        from django.utils import timezone
+
+        m.voted = timezone.now()
+        m.save(update_fields=['voted'])
 
         return redirect('matchup')
 
