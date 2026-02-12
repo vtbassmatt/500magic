@@ -1,0 +1,57 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>500 Magic cards - Leaderboard</title>
+<link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
+<link rel="apple-touch-icon" href="{% static 'apple-touch-icon.svg' %}">
+<link rel="manifest" href="{% static 'site.webmanifest' %}">
+<meta name="theme-color" content="#3d3dc4">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2em 1em; }
+  h1 { margin-bottom: 0.25em; font-size: 1.2em; }
+  p.subtitle { margin-bottom: 1.5em; color: #aaa; }
+  a { color: #f0c040; }
+  ol { list-style: none; width: 100%; max-width: 700px; }
+  ol li { display: flex; align-items: center; gap: 1em; padding: 0.6em 0; border-bottom: 1px solid #2a2a4e; }
+  .rank { font-size: 1.3em; font-weight: bold; color: #f0c040; min-width: 2em; text-align: right; }
+  .card-img { width: 60px; border-radius: 5px; }
+  .card-info { flex: 1; }
+  .card-name { font-size: 1em; font-weight: bold; }
+  .card-stats { font-size: 0.8em; color: #aaa; }
+  .vote-link { margin-top: 1.5em; }
+  footer { margin-top: 2em; max-width: 600px; text-align: center; }
+  footer p { font-size: 0.7em; color: #777; }
+  footer a { color: #999; }
+</style>
+</head>
+<body>
+  <h1>Top 10 Most Famous Cards</h1>
+  <p class="subtitle">Ranked by Elo rating</p>
+  {% if cards %}
+  <ol>
+    {% for card in cards %}
+    <li>
+      <span class="rank">{{ forloop.counter }}</span>
+      {% if card.image_url %}
+      <img src="{{ card.image_url }}" alt="{{ card.name }}" class="card-img" width="60" height="84">
+      {% endif %}
+      <div class="card-info">
+        <div class="card-name">{{ card.name }}</div>
+        <div class="card-stats">{{ card.rating|floatformat:0 }} Elo · {{ card.wins }}W {{ card.losses }}L</div>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p>No ratings yet. <a href="{% url 'matchup' %}">Start voting!</a></p>
+  {% endif %}
+  <p class="vote-link"><a href="{% url 'matchup' %}">← Vote on more matchups</a></p>
+  <footer>
+    <p>This is unofficial Fan Content permitted under the <a href="https://company.wizards.com/en/legal/fancontentpolicy">Fan Content Policy</a>. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. &copy;Wizards of the Coast LLC.</p>
+  </footer>
+</body>
+</html>

@@ -115,6 +115,40 @@ def matchup(request):
     return HttpResponseNotAllowed(['GET', 'POST'])
 
 
+def leaderboard(request):
+    top_cards = CardRating.objects.order_by('-rating')[:10]
+
+    # Resolve card names to image URLs via mtgjson
+    cards = []
+    for cr in top_cards:
+        # Find any printing of this card with a scryfall image
+        card = (
+            Card.objects.using('mtgjson')
+            .filter(name=cr.name)
+            .first()
+        )
+        image_url = None
+        if card:
+            ident = (
+                CardIdentifiers.objects.using('mtgjson')
+                .filter(uuid=card.uuid)
+                .exclude(scryfallId__isnull=True)
+                .exclude(scryfallId='')
+                .first()
+            )
+            if ident:
+                image_url = ident.scryfall_image_url()
+        cards.append({
+            'name': cr.name,
+            'rating': cr.rating,
+            'wins': cr.wins,
+            'losses': cr.losses,
+            'image_url': image_url,
+        })
+
+    return render(request, 'matchup/leaderboard.html', {'cards': cards})
+
+
 def _update_elo(card_1_uuid: str, card_2_uuid: str, chosen_uuid: str) -> None:
     """Resolve card UUIDs to names and update Elo ratings."""
     names = dict(
