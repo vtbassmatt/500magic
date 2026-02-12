@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+from os import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,16 +20,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BASE_DIR.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-mie(ew6u!9(#q6v*r5!959_qa6#d8!u!h5ndq(b2$$-=#k(f8#'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
+if 'FLY_PROCESS_GROUP' in environ:
+    RUNNING_ON_FLY = True
+    SECRET_KEY = environ['SECRET_KEY']
+    DEBUG = False
+    ALLOWED_HOSTS = ['500magic.fly.dev']
+    CSRF_TRUSTED_ORIGINS = ['https://500magic.fly.dev']
+else:
+    RUNNING_ON_FLY = False
+    SECRET_KEY = 'django-insecure-mie(ew6u!9(#q6v*r5!959_qa6#d8!u!h5ndq(b2$$-=#k(f8#'
+    DEBUG = True
+    ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -76,16 +78,28 @@ WSGI_APPLICATION = 'fivehundredmagic.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': REPO_DIR / 'data' / 'db.sqlite3',
-    },
-    'mtgjson': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': REPO_DIR / 'data' / 'AllPrintings.sqlite',
-    },
-}
+if RUNNING_ON_FLY:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': Path('/') / 'data' / 'db.sqlite3',
+        },
+        'mtgjson': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': Path('/') / 'data' / 'AllPrintings.sqlite',
+        },
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': REPO_DIR / 'data' / 'db.sqlite3',
+        },
+        'mtgjson': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': REPO_DIR / 'data' / 'AllPrintings.sqlite',
+        },
+    }
 
 DATABASE_ROUTERS = ['matchup.db_router.MtgjsonRouter']
 
