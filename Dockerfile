@@ -14,6 +14,7 @@ WORKDIR /code
 # RUN pip install uv
 COPY . /code
 RUN uv sync --locked
+RUN uv run src/manage.py collectstatic
 
 EXPOSE 8000
 
