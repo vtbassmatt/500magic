@@ -40,10 +40,12 @@ class Command(BaseCommand):
             self.stdout.write(f"No unvoted matchups older than {hours} hours found.")
             return
         
+        matchup_word = "matchup" if count == 1 else "matchups"
+        
         if dry_run:
             self.stdout.write(
                 self.style.WARNING(
-                    f"DRY RUN: Would delete {count} unvoted matchup(s) "
+                    f"DRY RUN: Would delete {count} unvoted {matchup_word} "
                     f"older than {hours} hours."
                 )
             )
@@ -59,9 +61,10 @@ class Command(BaseCommand):
                     self.stdout.write(f"  ... and {count - 10} more")
         else:
             deleted_count, _ = old_matchups.delete()
+            matchup_word = "matchup" if deleted_count == 1 else "matchups"
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Successfully deleted {deleted_count} unvoted matchup(s) "
+                    f"Successfully deleted {deleted_count} unvoted {matchup_word} "
                     f"older than {hours} hours."
                 )
             )
