@@ -328,7 +328,7 @@ class LanguageFilterTest(TestCase):
             setCode="TST",
             rarity="common",
             layout="normal",
-            language="en",
+            language="English",
             availability="paper",
         )
         CardIdentifiers.objects.using("mtgjson").create(
@@ -343,7 +343,7 @@ class LanguageFilterTest(TestCase):
             setCode="TST",
             rarity="common",
             layout="normal",
-            language="ph",
+            language="Phyrexian",
             availability="paper",
         )
         CardIdentifiers.objects.using("mtgjson").create(
@@ -358,7 +358,7 @@ class LanguageFilterTest(TestCase):
             setCode="TST",
             rarity="common",
             layout="normal",
-            language="ja",
+            language="Japanese",
             availability="paper",
         )
         CardIdentifiers.objects.using("mtgjson").create(

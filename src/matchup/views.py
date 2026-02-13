@@ -20,7 +20,7 @@ def _get_random_matchup():
         .exclude(isOversized=True)
         .exclude(side='b')
         .filter(availability__contains='paper')
-        .filter(language__in=['en', 'ph'])
+        .filter(language__in=['English', 'Phyrexian'])
     )
 
     # Get two random cards via ORDER BY RANDOM() on uuid
