@@ -118,6 +118,7 @@ def matchup(request):
 
 def leaderboard(request):
     top_cards = CardRating.objects.order_by('-rating')[:10]
+    total_votes = Vote.objects.count()
 
     # Resolve card names to image URLs via mtgjson
     cards = []
@@ -147,7 +148,10 @@ def leaderboard(request):
             'image_url': image_url,
         })
 
-    return render(request, 'matchup/leaderboard.html', {'cards': cards})
+    return render(request, 'matchup/leaderboard.html', {
+        'cards': cards,
+        'total_votes': total_votes,
+    })
 
 
 def _update_elo(card_1_uuid: str, card_2_uuid: str, chosen_uuid: str) -> None:

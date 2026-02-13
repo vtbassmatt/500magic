@@ -2,7 +2,7 @@ import uuid
 from unittest.mock import patch
 
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import override_settings, TestCase
 
 from .elo import expected_score, update_ratings
 from .models import Card, CardIdentifiers, CardRating, Matchup, Vote
@@ -42,7 +42,13 @@ def _mock_matchup():
         },
     )
 
-
+@override_settings(
+    STORAGES={
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+)
 class MatchupGetTest(TestCase):
     @patch("matchup.views._get_random_matchup", side_effect=lambda: _mock_matchup())
     def test_get_returns_200_with_two_cards(self, mock_get):
@@ -391,3 +397,105 @@ class LanguageFilterTest(TestCase):
             "ph-card-2222-2222-2222-222222222222",
         }
         self.assertTrue(seen_uuids.issubset(english_or_phyrexian))
+
+@override_settings(
+    STORAGES={
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+)
+class LeaderboardTest(TestCase):
+    databases = {"default", "mtgjson"}
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Create unmanaged tables in the test mtgjson database
+        from django.db import connections
+        with connections["mtgjson"].cursor() as cursor:
+            cursor.execute(
+                'CREATE TABLE IF NOT EXISTS "cards" ('
+                '"uuid" TEXT PRIMARY KEY, "name" TEXT, "setCode" TEXT, '
+                '"rarity" TEXT, "layout" TEXT, "isFunny" INTEGER, '
+                '"isOnlineOnly" INTEGER, "isOversized" INTEGER, '
+                '"availability" TEXT, "side" TEXT, "language" TEXT)'
+            )
+            cursor.execute(
+                'CREATE TABLE IF NOT EXISTS "cardIdentifiers" ('
+                '"uuid" TEXT PRIMARY KEY, "scryfallId" TEXT)'
+            )
+
+    def setUp(self):
+        """Seed test data with cards and ratings."""
+        # Create test cards
+        Card.objects.using("mtgjson").create(
+            uuid=CARD_1_UUID,
+            name="Lightning Bolt",
+            setCode="LEA",
+            rarity="common",
+            layout="normal",
+            language="English",
+        )
+        CardIdentifiers.objects.using("mtgjson").create(
+            uuid=CARD_1_UUID,
+            scryfallId="aaaaaaaa-1111-1111-1111-111111111111",
+        )
+        
+        Card.objects.using("mtgjson").create(
+            uuid=CARD_2_UUID,
+            name="Black Lotus",
+            setCode="LEA",
+            rarity="rare",
+            layout="normal",
+            language="English",
+        )
+        CardIdentifiers.objects.using("mtgjson").create(
+            uuid=CARD_2_UUID,
+            scryfallId="bbbbbbbb-2222-2222-2222-222222222222",
+        )
+
+    def test_leaderboard_shows_total_votes_zero(self):
+        """Test that leaderboard displays zero votes when no votes exist."""
+        response = self.client.get("/leaderboard/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "0 total votes")
+
+    def test_leaderboard_shows_total_votes_after_voting(self):
+        """Test that leaderboard displays correct total vote count."""
+        # Create some votes
+        Vote.objects.create(
+            card_1_uuid=CARD_1_UUID,
+            card_2_uuid=CARD_2_UUID,
+            chosen_uuid=CARD_1_UUID,
+            ip_address="127.0.0.1",
+        )
+        Vote.objects.create(
+            card_1_uuid=CARD_1_UUID,
+            card_2_uuid=CARD_2_UUID,
+            chosen_uuid=CARD_2_UUID,
+            ip_address="127.0.0.1",
+        )
+        Vote.objects.create(
+            card_1_uuid=CARD_1_UUID,
+            card_2_uuid=CARD_2_UUID,
+            chosen_uuid=CARD_1_UUID,
+            ip_address="127.0.0.1",
+        )
+
+        response = self.client.get("/leaderboard/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "3 total votes")
+
+    def test_leaderboard_displays_card_ratings(self):
+        """Test that leaderboard shows card ratings when they exist."""
+        # Create card ratings
+        CardRating.objects.create(name="Lightning Bolt", rating=1600, wins=5, losses=2)
+        CardRating.objects.create(name="Black Lotus", rating=1550, wins=3, losses=4)
+
+        response = self.client.get("/leaderboard/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Lightning Bolt")
+        self.assertContains(response, "Black Lotus")
+        self.assertContains(response, "1600 Elo")
+        self.assertContains(response, "5W 2L")
