@@ -529,3 +529,34 @@ class CleanupMatchupsCommandTest(TestCase):
         output = out.getvalue()
         self.assertIn("Successfully deleted 1 unvoted matchup", output)
         self.assertFalse(Matchup.objects.filter(token=matchup.token).exists())
+
+    def test_cleanup_multiple_matchups(self):
+        """Test cleanup handles multiple old unvoted matchups correctly."""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        now = timezone.now()
+        
+        # Create 3 old matchups
+        for i in range(3):
+            m = Matchup.objects.create(
+                card_1_uuid=f"test-{i}-1",
+                card_2_uuid=f"test-{i}-2"
+            )
+            Matchup.objects.filter(pk=m.pk).update(created_at=now - timedelta(hours=30))
+        
+        from io import StringIO
+        
+        # Test dry-run with multiple matchups
+        out = StringIO()
+        call_command("cleanup_matchups", "--dry-run", stdout=out)
+        output = out.getvalue()
+        self.assertIn("Would delete 3 unvoted matchup", output)
+        self.assertEqual(Matchup.objects.filter(voted__isnull=True).count(), 3)
+        
+        # Test actual deletion
+        out = StringIO()
+        call_command("cleanup_matchups", stdout=out)
+        output = out.getvalue()
+        self.assertIn("Successfully deleted 3 unvoted matchup", output)
+        self.assertEqual(Matchup.objects.filter(voted__isnull=True).count(), 0)
