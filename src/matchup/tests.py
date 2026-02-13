@@ -391,3 +391,172 @@ class LanguageFilterTest(TestCase):
             "ph-card-2222-2222-2222-222222222222",
         }
         self.assertTrue(seen_uuids.issubset(english_or_phyrexian))
+
+
+class MatchupStatsCommandTest(TestCase):
+    def test_stats_with_no_matchups(self):
+        """Test stats command with no unvoted matchups."""
+        from io import StringIO
+        out = StringIO()
+        call_command("matchup_stats", stdout=out)
+        output = out.getvalue()
+        self.assertIn("No unvoted matchups found", output)
+
+    def test_stats_with_various_age_matchups(self):
+        """Test stats command with matchups of different ages."""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        now = timezone.now()
+        
+        # Create matchups with different ages
+        # 1 hour old (should be in < 2 hours bucket)
+        m1 = Matchup.objects.create(card_1_uuid=CARD_1_UUID, card_2_uuid=CARD_2_UUID)
+        Matchup.objects.filter(pk=m1.pk).update(created_at=now - timedelta(hours=1))
+        
+        # 5 hours old (should be in 2-8 hours bucket)
+        m2 = Matchup.objects.create(card_1_uuid=CARD_1_UUID, card_2_uuid=CARD_2_UUID)
+        Matchup.objects.filter(pk=m2.pk).update(created_at=now - timedelta(hours=5))
+        
+        # 12 hours old (should be in 8-24 hours bucket)
+        m3 = Matchup.objects.create(card_1_uuid=CARD_1_UUID, card_2_uuid=CARD_2_UUID)
+        Matchup.objects.filter(pk=m3.pk).update(created_at=now - timedelta(hours=12))
+        
+        # 30 hours old (should be in 24+ hours bucket)
+        m4 = Matchup.objects.create(card_1_uuid=CARD_1_UUID, card_2_uuid=CARD_2_UUID)
+        Matchup.objects.filter(pk=m4.pk).update(created_at=now - timedelta(hours=30))
+        
+        # Already voted matchup (should not be counted)
+        m5 = Matchup.objects.create(card_1_uuid=CARD_1_UUID, card_2_uuid=CARD_2_UUID, voted=now)
+        Matchup.objects.filter(pk=m5.pk).update(created_at=now - timedelta(hours=50))
+        
+        from io import StringIO
+        out = StringIO()
+        call_command("matchup_stats", stdout=out)
+        output = out.getvalue()
+        
+        # Verify the output contains expected information
+        self.assertIn("Total unvoted matchups: 4", output)
+        self.assertIn("< 2 hours", output)
+        self.assertIn("2-8 hours", output)
+        self.assertIn("8-24 hours", output)
+        self.assertIn("24+ hours", output)
+
+
+class CleanupMatchupsCommandTest(TestCase):
+    def test_cleanup_no_old_matchups(self):
+        """Test cleanup when there are no old unvoted matchups."""
+        from io import StringIO
+        out = StringIO()
+        call_command("cleanup_matchups", stdout=out)
+        output = out.getvalue()
+        self.assertIn("No unvoted matchups older than 24 hours found", output)
+
+    def test_cleanup_dry_run(self):
+        """Test cleanup in dry-run mode."""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        now = timezone.now()
+        
+        # Create old matchup
+        old_matchup = Matchup.objects.create(card_1_uuid=CARD_1_UUID, card_2_uuid=CARD_2_UUID)
+        Matchup.objects.filter(pk=old_matchup.pk).update(created_at=now - timedelta(hours=30))
+        
+        from io import StringIO
+        out = StringIO()
+        call_command("cleanup_matchups", "--dry-run", stdout=out)
+        output = out.getvalue()
+        
+        self.assertIn("DRY RUN", output)
+        self.assertIn("Would delete 1 unvoted matchup", output)
+        
+        # Verify matchup was NOT deleted
+        self.assertTrue(Matchup.objects.filter(token=old_matchup.token).exists())
+
+    def test_cleanup_deletes_old_matchups(self):
+        """Test that cleanup actually deletes old unvoted matchups."""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        now = timezone.now()
+        
+        # Create old unvoted matchup (should be deleted)
+        old_matchup = Matchup.objects.create(card_1_uuid=CARD_1_UUID, card_2_uuid=CARD_2_UUID)
+        Matchup.objects.filter(pk=old_matchup.pk).update(created_at=now - timedelta(hours=30))
+        
+        # Create recent unvoted matchup (should NOT be deleted)
+        recent_matchup = Matchup.objects.create(card_1_uuid=CARD_1_UUID, card_2_uuid=CARD_2_UUID)
+        Matchup.objects.filter(pk=recent_matchup.pk).update(created_at=now - timedelta(hours=1))
+        
+        # Create old voted matchup (should NOT be deleted)
+        old_voted_matchup = Matchup.objects.create(card_1_uuid=CARD_1_UUID, card_2_uuid=CARD_2_UUID, voted=now)
+        Matchup.objects.filter(pk=old_voted_matchup.pk).update(created_at=now - timedelta(hours=30))
+        
+        from io import StringIO
+        out = StringIO()
+        call_command("cleanup_matchups", stdout=out)
+        output = out.getvalue()
+        
+        self.assertIn("Successfully deleted 1 unvoted matchup", output)
+        
+        # Verify correct matchups were deleted/kept
+        self.assertFalse(Matchup.objects.filter(token=old_matchup.token).exists())
+        self.assertTrue(Matchup.objects.filter(token=recent_matchup.token).exists())
+        self.assertTrue(Matchup.objects.filter(token=old_voted_matchup.token).exists())
+
+    def test_cleanup_with_custom_hours(self):
+        """Test cleanup with custom hour threshold."""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        now = timezone.now()
+        
+        # Create matchup that's 10 hours old
+        matchup = Matchup.objects.create(card_1_uuid=CARD_1_UUID, card_2_uuid=CARD_2_UUID)
+        Matchup.objects.filter(pk=matchup.pk).update(created_at=now - timedelta(hours=10))
+        
+        from io import StringIO
+        
+        # Should not delete with default 24 hour threshold
+        out = StringIO()
+        call_command("cleanup_matchups", stdout=out)
+        self.assertTrue(Matchup.objects.filter(token=matchup.token).exists())
+        
+        # Should delete with 8 hour threshold
+        out = StringIO()
+        call_command("cleanup_matchups", "--hours", "8", stdout=out)
+        output = out.getvalue()
+        self.assertIn("Successfully deleted 1 unvoted matchup", output)
+        self.assertFalse(Matchup.objects.filter(token=matchup.token).exists())
+
+    def test_cleanup_multiple_matchups(self):
+        """Test cleanup handles multiple old unvoted matchups correctly."""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        now = timezone.now()
+        
+        # Create 3 old matchups
+        for i in range(3):
+            m = Matchup.objects.create(
+                card_1_uuid=f"test-{i}-1",
+                card_2_uuid=f"test-{i}-2"
+            )
+            Matchup.objects.filter(pk=m.pk).update(created_at=now - timedelta(hours=30))
+        
+        from io import StringIO
+        
+        # Test dry-run with multiple matchups
+        out = StringIO()
+        call_command("cleanup_matchups", "--dry-run", stdout=out)
+        output = out.getvalue()
+        self.assertIn("Would delete 3 unvoted matchup", output)
+        self.assertEqual(Matchup.objects.filter(voted__isnull=True).count(), 3)
+        
+        # Test actual deletion
+        out = StringIO()
+        call_command("cleanup_matchups", stdout=out)
+        output = out.getvalue()
+        self.assertIn("Successfully deleted 3 unvoted matchup", output)
+        self.assertEqual(Matchup.objects.filter(voted__isnull=True).count(), 0)
