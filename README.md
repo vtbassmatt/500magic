@@ -34,6 +34,41 @@ uv run python manage.py runserver
 
 Then open http://127.0.0.1:8000/.
 
+## Management Commands
+
+### View matchup statistics
+
+Display statistics about unvoted matchups bucketed by age:
+
+```sh
+cd src
+uv run python manage.py matchup_stats
+```
+
+This shows the count and percentage of unvoted matchups in each age bucket:
+- < 2 hours
+- 2-8 hours
+- 8-24 hours
+- 24+ hours
+
+### Clean up old matchups
+
+Delete old unvoted matchups to prevent database bloat:
+
+```sh
+cd src
+# Preview what would be deleted (dry-run)
+uv run python manage.py cleanup_matchups --dry-run
+
+# Delete matchups older than 24 hours (default)
+uv run python manage.py cleanup_matchups
+
+# Delete matchups older than a custom threshold
+uv run python manage.py cleanup_matchups --hours 48
+```
+
+Only unvoted matchups are deleted. Voted matchups are preserved regardless of age.
+
 ## Tests
 
 ```sh
