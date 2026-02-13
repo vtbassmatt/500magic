@@ -16,6 +16,7 @@ class Card(models.Model):
     isOversized = models.BooleanField(db_column='isOversized', null=True)
     availability = models.TextField(null=True)
     side = models.TextField(null=True)
+    language = models.TextField(null=True)
 
     class Meta:
         managed = False
