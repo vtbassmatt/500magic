@@ -224,7 +224,7 @@ class EloVoteIntegrationTest(TestCase):
                 '"uuid" TEXT PRIMARY KEY, "name" TEXT, "setCode" TEXT, '
                 '"rarity" TEXT, "layout" TEXT, "isFunny" INTEGER, '
                 '"isOnlineOnly" INTEGER, "isOversized" INTEGER, '
-                '"availability" TEXT, "side" TEXT)'
+                '"availability" TEXT, "side" TEXT, "language" TEXT)'
             )
 
     def _seed_mtgjson_cards(self):
@@ -235,6 +235,7 @@ class EloVoteIntegrationTest(TestCase):
             setCode="LEA",
             rarity="common",
             layout="normal",
+            language="en",
         )
         Card.objects.using("mtgjson").create(
             uuid=CARD_2_UUID,
@@ -242,6 +243,7 @@ class EloVoteIntegrationTest(TestCase):
             setCode="LEA",
             rarity="rare",
             layout="normal",
+            language="en",
         )
 
     def _vote(self, card_1, card_2, chosen):
@@ -294,3 +296,97 @@ class EloVoteIntegrationTest(TestCase):
         self.assertAlmostEqual(lotus_live.rating, lotus_recalc.rating, places=6)
         self.assertEqual(bolt_live.wins, bolt_recalc.wins)
         self.assertEqual(lotus_live.losses, lotus_recalc.losses)
+
+
+class LanguageFilterTest(TestCase):
+    databases = {"default", "mtgjson"}
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Create unmanaged tables in the test mtgjson database
+        from django.db import connections
+        with connections["mtgjson"].cursor() as cursor:
+            cursor.execute(
+                'CREATE TABLE IF NOT EXISTS "cards" ('
+                '"uuid" TEXT PRIMARY KEY, "name" TEXT, "setCode" TEXT, '
+                '"rarity" TEXT, "layout" TEXT, "isFunny" INTEGER, '
+                '"isOnlineOnly" INTEGER, "isOversized" INTEGER, '
+                '"availability" TEXT, "side" TEXT, "language" TEXT)'
+            )
+            cursor.execute(
+                'CREATE TABLE IF NOT EXISTS "cardIdentifiers" ('
+                '"uuid" TEXT PRIMARY KEY, "scryfallId" TEXT)'
+            )
+
+    def setUp(self):
+        """Seed test database with cards in different languages."""
+        # English card
+        Card.objects.using("mtgjson").create(
+            uuid="en-card-1111-1111-1111-111111111111",
+            name="English Card",
+            setCode="TST",
+            rarity="common",
+            layout="normal",
+            language="en",
+            availability="paper",
+        )
+        CardIdentifiers.objects.using("mtgjson").create(
+            uuid="en-card-1111-1111-1111-111111111111",
+            scryfallId="aaaaaaaa-1111-1111-1111-111111111111",
+        )
+        
+        # Phyrexian card
+        Card.objects.using("mtgjson").create(
+            uuid="ph-card-2222-2222-2222-222222222222",
+            name="Phyrexian Card",
+            setCode="TST",
+            rarity="common",
+            layout="normal",
+            language="ph",
+            availability="paper",
+        )
+        CardIdentifiers.objects.using("mtgjson").create(
+            uuid="ph-card-2222-2222-2222-222222222222",
+            scryfallId="bbbbbbbb-2222-2222-2222-222222222222",
+        )
+        
+        # Japanese card (should be filtered out)
+        Card.objects.using("mtgjson").create(
+            uuid="ja-card-3333-3333-3333-333333333333",
+            name="Japanese Card",
+            setCode="TST",
+            rarity="common",
+            layout="normal",
+            language="ja",
+            availability="paper",
+        )
+        CardIdentifiers.objects.using("mtgjson").create(
+            uuid="ja-card-3333-3333-3333-333333333333",
+            scryfallId="cccccccc-3333-3333-3333-333333333333",
+        )
+
+    def test_language_filter_excludes_non_english_non_phyrexian(self):
+        """Verify that only English and Phyrexian cards are selected."""
+        from matchup.views import _get_random_matchup
+        
+        # Get 50 matchups and verify no Japanese cards appear
+        seen_uuids = set()
+        for _ in range(50):
+            card1, card2 = _get_random_matchup()
+            if card1 and card2:
+                seen_uuids.add(card1['uuid'])
+                seen_uuids.add(card2['uuid'])
+        
+        # Verify we saw some cards
+        self.assertGreater(len(seen_uuids), 0)
+        
+        # Verify no Japanese card was selected
+        self.assertNotIn("ja-card-3333-3333-3333-333333333333", seen_uuids)
+        
+        # Verify we can see English and/or Phyrexian cards
+        english_or_phyrexian = {
+            "en-card-1111-1111-1111-111111111111",
+            "ph-card-2222-2222-2222-222222222222",
+        }
+        self.assertTrue(seen_uuids.issubset(english_or_phyrexian))
