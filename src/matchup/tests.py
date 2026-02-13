@@ -441,7 +441,7 @@ class LeaderboardTest(TestCase):
             uuid=CARD_1_UUID,
             scryfallId="aaaaaaaa-1111-1111-1111-111111111111",
         )
-        
+
         Card.objects.using("mtgjson").create(
             uuid=CARD_2_UUID,
             name="Black Lotus",
