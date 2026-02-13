@@ -370,9 +370,10 @@ class LanguageFilterTest(TestCase):
         """Verify that only English and Phyrexian cards are selected."""
         from matchup.views import _get_random_matchup
         
-        # Get 50 matchups and verify no Japanese cards appear
+        NUM_TEST_ITERATIONS = 50
+        # Get multiple matchups and verify no Japanese cards appear
         seen_uuids = set()
-        for _ in range(50):
+        for _ in range(NUM_TEST_ITERATIONS):
             card1, card2 = _get_random_matchup()
             if card1 and card2:
                 seen_uuids.add(card1['uuid'])
