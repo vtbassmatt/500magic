@@ -7,11 +7,19 @@ from .elo import update_ratings
 from .models import Card, CardIdentifiers, CardRating, Matchup, Vote
 
 
+def _is_basic_land(card):
+    """Check if a card is a basic land."""
+    return card.supertypes and 'Basic' in card.supertypes
+
+
 def _get_random_matchup():
     """Pick two random distinct cards that have scryfall images.
 
     We join cards and cardIdentifiers, filter to "real" paper cards,
-    and pick two at random using SQLite's RANDOM().
+    and pick three at random using SQLite's RANDOM(). If exactly one
+    is a basic land, we return the other two. Otherwise, we return
+    the first two. This reduces basic land frequency while still
+    allowing them to appear occasionally.
     """
     qs = (
         Card.objects.using('mtgjson')
@@ -23,10 +31,19 @@ def _get_random_matchup():
         .filter(language__in=['English', 'Phyrexian'])
     )
 
-    # Get two random cards via ORDER BY RANDOM() on uuid
-    random_cards = list(qs.order_by('?')[:2])
-    if len(random_cards) < 2:
+    # Get three random cards via ORDER BY RANDOM() on uuid
+    random_cards = list(qs.order_by('?')[:3])
+    if len(random_cards) < 3:
         return None, None
+
+    # If exactly one is a basic land, return the other two
+    basic_lands = [card for card in random_cards if _is_basic_land(card)]
+    if len(basic_lands) == 1:
+        # Remove the basic land and use the other two
+        random_cards = [card for card in random_cards if not _is_basic_land(card)]
+    else:
+        # Otherwise, just use the first two
+        random_cards = random_cards[:2]
 
     results = []
     for card in random_cards:
