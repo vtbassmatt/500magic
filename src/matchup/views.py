@@ -1,3 +1,5 @@
+import random
+
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import redirect, render
@@ -6,12 +8,23 @@ from django.utils import timezone
 from .elo import update_ratings
 from .models import Card, CardIdentifiers, CardRating, Matchup, Vote
 
+# Probability that a basic land will be rejected when selected (0.0 = never reject, 1.0 = always reject)
+BASIC_LAND_REJECTION_RATE = 0.9
+
+
+def _is_basic_land(card):
+    """Check if a card is a basic land."""
+    return card.supertypes and 'Basic' in card.supertypes
+
 
 def _get_random_matchup():
     """Pick two random distinct cards that have scryfall images.
 
     We join cards and cardIdentifiers, filter to "real" paper cards,
     and pick two at random using SQLite's RANDOM().
+    
+    Basic lands are probabilistically rejected to reduce their frequency
+    in matchups while still allowing them to appear occasionally.
     """
     qs = (
         Card.objects.using('mtgjson')
@@ -27,6 +40,11 @@ def _get_random_matchup():
     random_cards = list(qs.order_by('?')[:2])
     if len(random_cards) < 2:
         return None, None
+
+    # Reject basic lands probabilistically
+    for card in random_cards:
+        if _is_basic_land(card) and random.random() < BASIC_LAND_REJECTION_RATE:
+            return _get_random_matchup()  # retry
 
     results = []
     for card in random_cards:

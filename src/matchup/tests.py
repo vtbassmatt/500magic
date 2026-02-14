@@ -230,7 +230,8 @@ class EloVoteIntegrationTest(TestCase):
                 '"uuid" TEXT PRIMARY KEY, "name" TEXT, "setCode" TEXT, '
                 '"rarity" TEXT, "layout" TEXT, "isFunny" INTEGER, '
                 '"isOnlineOnly" INTEGER, "isOversized" INTEGER, '
-                '"availability" TEXT, "side" TEXT, "language" TEXT)'
+                '"availability" TEXT, "side" TEXT, "language" TEXT, '
+                '"supertypes" TEXT)'
             )
 
     def _seed_mtgjson_cards(self):
@@ -318,7 +319,8 @@ class LanguageFilterTest(TestCase):
                 '"uuid" TEXT PRIMARY KEY, "name" TEXT, "setCode" TEXT, '
                 '"rarity" TEXT, "layout" TEXT, "isFunny" INTEGER, '
                 '"isOnlineOnly" INTEGER, "isOversized" INTEGER, '
-                '"availability" TEXT, "side" TEXT, "language" TEXT)'
+                '"availability" TEXT, "side" TEXT, "language" TEXT, '
+                '"supertypes" TEXT)'
             )
             cursor.execute(
                 'CREATE TABLE IF NOT EXISTS "cardIdentifiers" ('
@@ -419,7 +421,8 @@ class LeaderboardTest(TestCase):
                 '"uuid" TEXT PRIMARY KEY, "name" TEXT, "setCode" TEXT, '
                 '"rarity" TEXT, "layout" TEXT, "isFunny" INTEGER, '
                 '"isOnlineOnly" INTEGER, "isOversized" INTEGER, '
-                '"availability" TEXT, "side" TEXT, "language" TEXT)'
+                '"availability" TEXT, "side" TEXT, "language" TEXT, '
+                '"supertypes" TEXT)'
             )
             cursor.execute(
                 'CREATE TABLE IF NOT EXISTS "cardIdentifiers" ('
@@ -667,3 +670,134 @@ class CleanupMatchupsCommandTest(TestCase):
         output = out.getvalue()
         self.assertIn("Successfully deleted 3 unvoted matchup", output)
         self.assertEqual(Matchup.objects.filter(voted__isnull=True).count(), 0)
+
+
+class BasicLandFilterTest(TestCase):
+    databases = {"default", "mtgjson"}
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from django.db import connections
+        with connections["mtgjson"].cursor() as cursor:
+            cursor.execute(
+                'CREATE TABLE IF NOT EXISTS "cards" ('
+                '"uuid" TEXT PRIMARY KEY, "name" TEXT, "setCode" TEXT, '
+                '"rarity" TEXT, "layout" TEXT, "isFunny" INTEGER, '
+                '"isOnlineOnly" INTEGER, "isOversized" INTEGER, '
+                '"availability" TEXT, "side" TEXT, "language" TEXT, '
+                '"supertypes" TEXT)'
+            )
+            cursor.execute(
+                'CREATE TABLE IF NOT EXISTS "cardIdentifiers" ('
+                '"uuid" TEXT PRIMARY KEY, "scryfallId" TEXT)'
+            )
+
+    def setUp(self):
+        """Seed test database with basic and non-basic cards."""
+        # Basic land (Forest)
+        Card.objects.using("mtgjson").create(
+            uuid="forest-1111-1111-1111-111111111111",
+            name="Forest",
+            setCode="TST",
+            rarity="common",
+            layout="normal",
+            language="English",
+            availability="paper",
+            supertypes="Basic",
+        )
+        CardIdentifiers.objects.using("mtgjson").create(
+            uuid="forest-1111-1111-1111-111111111111",
+            scryfallId="aaaaaaaa-1111-1111-1111-111111111111",
+        )
+        
+        # Basic land (Island)
+        Card.objects.using("mtgjson").create(
+            uuid="island-2222-2222-2222-222222222222",
+            name="Island",
+            setCode="TST",
+            rarity="common",
+            layout="normal",
+            language="English",
+            availability="paper",
+            supertypes="Basic",
+        )
+        CardIdentifiers.objects.using("mtgjson").create(
+            uuid="island-2222-2222-2222-222222222222",
+            scryfallId="bbbbbbbb-2222-2222-2222-222222222222",
+        )
+        
+        # Non-basic card
+        Card.objects.using("mtgjson").create(
+            uuid="bolt-3333-3333-3333-333333333333",
+            name="Lightning Bolt",
+            setCode="TST",
+            rarity="common",
+            layout="normal",
+            language="English",
+            availability="paper",
+            supertypes=None,
+        )
+        CardIdentifiers.objects.using("mtgjson").create(
+            uuid="bolt-3333-3333-3333-333333333333",
+            scryfallId="cccccccc-3333-3333-3333-333333333333",
+        )
+        
+        # Non-basic card
+        Card.objects.using("mtgjson").create(
+            uuid="lotus-4444-4444-4444-444444444444",
+            name="Black Lotus",
+            setCode="TST",
+            rarity="rare",
+            layout="normal",
+            language="English",
+            availability="paper",
+            supertypes=None,
+        )
+        CardIdentifiers.objects.using("mtgjson").create(
+            uuid="lotus-4444-4444-4444-444444444444",
+            scryfallId="dddddddd-4444-4444-4444-444444444444",
+        )
+
+    def test_basic_lands_appear_less_frequently(self):
+        """Verify basic lands appear less often than non-basic cards."""
+        from matchup.views import _get_random_matchup
+        
+        NUM_ITERATIONS = 200
+        basic_land_count = 0
+        total_card_count = 0
+        
+        for _ in range(NUM_ITERATIONS):
+            card1, card2 = _get_random_matchup()
+            if card1 and card2:
+                # Check if either card is a basic land
+                for card in [card1, card2]:
+                    if card['name'] in ['Forest', 'Island']:
+                        basic_land_count += 1
+                    total_card_count += 1
+        
+        # With 50% of cards being basic lands and 90% rejection rate,
+        # we expect roughly 5-15% of cards selected to be basic lands
+        # (accounting for randomness)
+        basic_land_ratio = basic_land_count / total_card_count if total_card_count > 0 else 0
+        
+        # Assert basic lands appear significantly less than 50%
+        self.assertLess(basic_land_ratio, 0.30, 
+                       f"Basic lands appeared {basic_land_ratio:.1%} of the time, expected < 30%")
+        
+        # Assert basic lands still appear sometimes (not never)
+        self.assertGreater(basic_land_count, 0,
+                          "Basic lands should still appear occasionally")
+
+    def test_is_basic_land_helper(self):
+        """Test the _is_basic_land helper function."""
+        from matchup.views import _is_basic_land
+        
+        # Test basic land
+        basic_card = Card.objects.using("mtgjson").get(name="Forest")
+        self.assertTrue(_is_basic_land(basic_card))
+        
+        # Test non-basic card
+        nonbasic_card = Card.objects.using("mtgjson").get(name="Lightning Bolt")
+        self.assertFalse(_is_basic_land(nonbasic_card))
+

@@ -17,6 +17,7 @@ class Card(models.Model):
     availability = models.TextField(null=True)
     side = models.TextField(null=True)
     language = models.TextField(null=True)
+    supertypes = models.TextField(null=True)
 
     class Meta:
         managed = False
