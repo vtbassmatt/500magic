@@ -1,5 +1,3 @@
-import random
-
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import redirect, render
@@ -7,9 +5,6 @@ from django.utils import timezone
 
 from .elo import update_ratings
 from .models import Card, CardIdentifiers, CardRating, Matchup, Vote
-
-# Probability that a basic land will be rejected when selected (0.0 = never reject, 1.0 = always reject)
-BASIC_LAND_REJECTION_RATE = 0.9
 
 
 def _is_basic_land(card):
@@ -21,10 +16,10 @@ def _get_random_matchup():
     """Pick two random distinct cards that have scryfall images.
 
     We join cards and cardIdentifiers, filter to "real" paper cards,
-    and pick two at random using SQLite's RANDOM().
-    
-    Basic lands are probabilistically rejected to reduce their frequency
-    in matchups while still allowing them to appear occasionally.
+    and pick three at random using SQLite's RANDOM(). If exactly one
+    is a basic land, we return the other two. Otherwise, we return
+    the first two. This reduces basic land frequency while still
+    allowing them to appear occasionally.
     """
     qs = (
         Card.objects.using('mtgjson')
@@ -36,15 +31,19 @@ def _get_random_matchup():
         .filter(language__in=['English', 'Phyrexian'])
     )
 
-    # Get two random cards via ORDER BY RANDOM() on uuid
-    random_cards = list(qs.order_by('?')[:2])
-    if len(random_cards) < 2:
+    # Get three random cards via ORDER BY RANDOM() on uuid
+    random_cards = list(qs.order_by('?')[:3])
+    if len(random_cards) < 3:
         return None, None
 
-    # Reject basic lands probabilistically
-    for card in random_cards:
-        if _is_basic_land(card) and random.random() < BASIC_LAND_REJECTION_RATE:
-            return _get_random_matchup()  # retry
+    # If exactly one is a basic land, return the other two
+    basic_lands = [card for card in random_cards if _is_basic_land(card)]
+    if len(basic_lands) == 1:
+        # Remove the basic land and use the other two
+        random_cards = [card for card in random_cards if not _is_basic_land(card)]
+    else:
+        # Otherwise, just use the first two
+        random_cards = random_cards[:2]
 
     results = []
     for card in random_cards:
