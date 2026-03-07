@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>500 Magic cards - Leaderboard</title>
+<title>500 Magic cards - Leaderboard{% if page_obj.number > 1 %} (page {{ page_obj.number }}){% endif %}</title>
 <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="{% static 'apple-touch-icon.svg' %}">
 <link rel="manifest" href="{% static 'site.webmanifest' %}">
@@ -23,19 +23,24 @@
   .card-name { font-size: 1em; font-weight: bold; }
   .card-stats { font-size: 0.8em; color: #aaa; }
   .vote-link { margin-top: 1.5em; }
+  .pagination { display: flex; gap: 0.5em; align-items: center; margin-top: 1.5em; }
+  .pagination a, .pagination span { padding: 0.4em 0.8em; border-radius: 4px; text-decoration: none; }
+  .pagination a { background: #2a2a4e; color: #f0c040; }
+  .pagination a:hover { background: #3a3a6e; }
+  .pagination .current { background: #f0c040; color: #1a1a2e; font-weight: bold; }
   footer { margin-top: 2em; max-width: 600px; text-align: center; }
   footer p { font-size: 0.7em; color: #777; }
   footer a { color: #999; }
 </style>
 </head>
 <body>
-  <h1>Top 10 Most Famous Cards</h1>
+  <h1>Most Famous Cards</h1>
   <p class="subtitle">Ranked by Elo rating · {{ total_votes }} total votes</p>
   {% if cards %}
   <ol>
     {% for card in cards %}
     <li>
-      <span class="rank">{{ forloop.counter }}</span>
+      <span class="rank">{{ page_obj.start_index|add:forloop.counter0 }}</span>
       {% if card.image_url %}
       <img src="{{ card.image_url }}" alt="{{ card.name }}" class="card-img" width="60" height="84">
       {% endif %}
@@ -48,6 +53,17 @@
   </ol>
   {% else %}
   <p>No ratings yet. <a href="{% url 'matchup' %}">Start voting!</a></p>
+  {% endif %}
+  {% if page_obj.has_other_pages %}
+  <div class="pagination">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}">← Previous</a>
+    {% endif %}
+    <span class="current">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}">Next →</a>
+    {% endif %}
+  </div>
   {% endif %}
   <p class="vote-link"><a href="{% url 'matchup' %}">← Vote on more matchups</a></p>
   <footer>

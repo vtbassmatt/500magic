@@ -1,4 +1,6 @@
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -134,12 +136,18 @@ def matchup(request):
 
 
 def leaderboard(request):
-    top_cards = CardRating.objects.order_by('-rating')[:10]
+    rated_cards = CardRating.objects.filter(
+        Q(wins__gt=0) | Q(losses__gt=0),
+    ).order_by('-rating')
     total_votes = Vote.objects.count()
+
+    paginator = Paginator(rated_cards, 50)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
 
     # Resolve card names to image URLs via mtgjson
     cards = []
-    for cr in top_cards:
+    for cr in page_obj:
         # Find any printing of this card with a scryfall image
         card = (
             Card.objects.using('mtgjson')
@@ -168,6 +176,7 @@ def leaderboard(request):
     return render(request, 'matchup/leaderboard.html', {
         'cards': cards,
         'total_votes': total_votes,
+        'page_obj': page_obj,
     })
 
 
