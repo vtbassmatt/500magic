@@ -519,6 +519,64 @@ class LeaderboardTest(TestCase):
         self.assertContains(response, "1600 Elo")
         self.assertContains(response, "5W 2L")
 
+    def test_leaderboard_excludes_unvoted_cards(self):
+        """Test that leaderboard only shows cards that have been voted on."""
+        CardRating.objects.create(name="Lightning Bolt", rating=1600, wins=5, losses=2)
+        CardRating.objects.create(name="Unvoted Card", rating=1500, wins=0, losses=0)
+
+        response = self.client.get("/leaderboard/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Lightning Bolt")
+        self.assertNotContains(response, "Unvoted Card")
+
+    def test_leaderboard_includes_win_only_cards(self):
+        """Test that cards with only wins (no losses yet) are shown."""
+        CardRating.objects.create(name="Lightning Bolt", rating=1600, wins=5, losses=0)
+
+        response = self.client.get("/leaderboard/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Lightning Bolt")
+
+    def test_leaderboard_includes_loss_only_cards(self):
+        """Test that cards with only losses (no wins yet) are shown."""
+        CardRating.objects.create(name="Lightning Bolt", rating=1400, wins=0, losses=5)
+
+        response = self.client.get("/leaderboard/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Lightning Bolt")
+
+    def test_leaderboard_pagination_page_two(self):
+        """Test that pagination works and page 2 shows correct rank numbers."""
+        # Create 55 cards so we have two pages
+        for i in range(55):
+            CardRating.objects.create(
+                name=f"Card {i:02d}",
+                rating=1500 + i,
+                wins=1,
+                losses=0,
+            )
+
+        response = self.client.get("/leaderboard/?page=2")
+        self.assertEqual(response.status_code, 200)
+        # Page 2 should start at rank 51
+        self.assertContains(response, "51")
+        # Should show "Next" and "Previous" nav
+        self.assertContains(response, "Previous")
+
+    def test_leaderboard_pagination_page_one_rank_starts_at_one(self):
+        """Test that rank numbers start at 1 on the first page."""
+        for i in range(5):
+            CardRating.objects.create(
+                name=f"Card {i:02d}",
+                rating=1500 + i,
+                wins=1,
+                losses=0,
+            )
+
+        response = self.client.get("/leaderboard/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, ">1<")
+
 class MatchupStatsCommandTest(TestCase):
     def test_stats_with_no_matchups(self):
         """Test stats command with no unvoted matchups."""
